@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-surface text-text-main font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.7;
+    background-color: #F4F7F9; /* Surface background */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', Georgia, serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* Custom sharp scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #E2E8F0;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #A0AEC0;
+    border-radius: 0px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #007BFF;
+  }
+}
+
+@layer utilities {
+  .section-blue-rule {
+    @apply relative pt-4;
+  }
+  .section-blue-rule::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 32px;
+    height: 1px;
+    background-color: #007BFF;
+  }
+  
+  .small-caps {
+    font-variant-caps: small-caps;
+    letter-spacing: 0.15em;
+  }
+}

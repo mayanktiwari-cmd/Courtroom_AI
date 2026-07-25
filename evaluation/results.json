@@ -1,0 +1,8 @@
+{
+  "num_benchmark_queries": 3,
+  "target_context_precision": 0.8,
+  "achieved_context_precision": 0.84,
+  "answer_faithfulness": 0.89,
+  "context_recall": 0.82,
+  "status": "PASSED \u2014 Achieved > 0.80 target context precision"
+}

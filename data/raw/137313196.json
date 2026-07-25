@@ -1,0 +1,37 @@
+{
+  "tid": 124204786,
+  "publishdate": "2015-01-15",
+  "title": "Section 12 in Securities and Exchange Board of India (Prohibition of Insider Trading) Regulations, 2015",
+  "doc": "<h2 class=\"doc_title\">Section 12 in Securities and Exchange Board of India (Prohibition of Insider Trading) Regulations, 2015</h2>\n\n<section class=\"akn-section\" id=\"section_12\"><h3>12. Repeal and Savings.</h3>\n<section class=\"akn-subsection\" id=\"section_12.1\"><span class=\"akn-num\"><a href=\"/doc/75047135/\">(1)</a></span><span class=\"akn-content\"><span class=\"akn-p\">The Securities and Exchange Board of India (Prohibition of Insider Trading) Regulations, 1992 are hereby repealed.</span></span></section><section class=\"akn-subsection\" id=\"section_12.2\"><span class=\"akn-num\"><a href=\"/doc/168352954/\">(2)</a></span><span class=\"akn-intro\"><span class=\"akn-p\">Notwithstanding such repeal, -</span></span><section class=\"akn-paragraph\" id=\"section_12.2.a\"><span class=\"akn-num\"><a href=\"/doc/157935910/\">(a)</a></span><span class=\"akn-content\"><span class=\"akn-p\">the previous operation of the repealed regulations or anything duly done or suffered thereunder, any right, privilege, obligation or liability acquired, accrued or incurred under the repealed regulations, any penalty, forfeiture or punishment incurred in respect of any offence committed against the repealed regulations, or any investigation, legal proceeding or remedy in respect of any such right, privilege, obligation, liability, penalty, forfeiture or punishment as aforesaid, shall remain unaffected as if the repealed regulations had never been repealed; and</span></span></section><section class=\"akn-paragraph\" id=\"section_12.2.b\"><span class=\"akn-num\"><a href=\"/doc/142414160/\">(b)</a></span><span class=\"akn-content\"><span class=\"akn-p\">anything done or any action taken or purported to have been done or taken including any adjudication, enquiry or investigation commenced or show-cause notice issued under the repealed regulations prior to such repeal, shall be deemed to have been done or taken under the corresponding provisions of these regulations;</span></span></section></section><section class=\"akn-subsection\" id=\"section_12.3\"><span class=\"akn-num\"><a href=\"/doc/11188701/\">(3)</a></span><span class=\"akn-content\"><span class=\"akn-p\">After the repeal of Securities and Exchange Board of India (Prohibition of Insider Trading) Regulations, 1992, any reference thereto in any other regulations made, guidelines or circulars issued thereunder by the Board shall be deemed to be a reference to the corresponding provisions of these regulations.</span></span></section></section>",
+  "numcites": 0,
+  "numcitedby": 0,
+  "docid": 124204786,
+  "docsource": "Securities And Exchange Board Of India - Section",
+  "covers": [
+    {
+      "tid": 95918043,
+      "title": "Entire Act"
+    }
+  ],
+  "citetid": 137313196,
+  "divtype": "akoma-ntoso",
+  "relatedqs": [
+    {
+      "value": "\"insider\" AND \"TRADING\"",
+      "formInput": "%22insider%22%20AND%20%22TRADING%22"
+    },
+    {
+      "value": "\"insider trading\"",
+      "formInput": "%22insider%20trading%22"
+    }
+  ],
+  "courtcopy": false,
+  "query_alert": null,
+  "_meta": {
+    "query_category": "SEBI insider trading",
+    "title": "Section 12 in <b>Securities</b> and <b>Exchange</b> <b>Board</b> of <b>India</b> (Prohibition of <b>Insider</b> <b>Trading</b>) Regulations, 2015",
+    "court": "",
+    "date": "",
+    "doc_id": "137313196"
+  }
+}
