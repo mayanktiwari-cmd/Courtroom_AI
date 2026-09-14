@@ -11,10 +11,8 @@ Acts included:
 
 import json
 from pathlib import Path
-
 DATA_DIR = Path("data/raw")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-
 KEY_BARE_ACTS = [
     {
         "act_name": "Indian Penal Code",
@@ -74,7 +72,6 @@ KEY_BARE_ACTS = [
         ]
     }
 ]
-
 def save_bare_acts():
     """Save structured Bare Acts as raw JSON documents for ingestion."""
     count = 0
@@ -97,6 +94,5 @@ def save_bare_acts():
                 json.dump(doc, f, indent=2)
             count += 1
     print(f"[BARE ACTS] Saved {count} bare act sections to {DATA_DIR}")
-
 if __name__ == "__main__":
     save_bare_acts()

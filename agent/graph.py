@@ -50,7 +50,7 @@ def create_graph():
 
     # LLM with tool bindings — uses 70B for routing decisions
     llm = ChatGroq(
-        model="llama3-70b-8192",
+        model="llama-3.3-70b-versatile",
         temperature=0.1,
         api_key=os.getenv("GROQ_API_KEY"),
     )

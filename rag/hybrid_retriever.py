@@ -163,17 +163,13 @@ class LegalHybridRetriever:
         for doc in docs:
             doc.page_content = self._clean_html(doc.page_content)
         return docs
-
-
 if __name__ == "__main__":
     retriever = LegalHybridRetriever()
-
     test_queries = [
         "bail application murder case IPC 302",
         "dowry harassment wife Section 498A",
         "cheating fraud IPC 420 conviction",
     ]
-
     for query in test_queries:
         print(f"\n{'='*50}")
         print(f"QUERY: {query}")

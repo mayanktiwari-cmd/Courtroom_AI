@@ -52,7 +52,7 @@ Respond ONLY in this exact JSON format, nothing else:
 class CitationVerifier:
     def __init__(self):
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        self.model = "llama3-70b-8192"  # 70B for accuracy — citation verification is critical
+        self.model = "llama-3.3-70b-versatile"  # 70B for accuracy — citation verification is critical
 
     def verify_single(self, argument: str, document: Document) -> VerificationResult:
         """Verify one passage against one argument."""

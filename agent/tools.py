@@ -122,7 +122,7 @@ Respond ONLY in this JSON format:
 
     client = get_llm()
     response = client.chat.completions.create(
-        model="llama3-70b-8192",  # use 70B for legal reasoning accuracy
+        model="llama-3.3-70b-versatile",  # use 70B for legal reasoning accuracy
         messages=[{"role": "user", "content": prompt}],
         temperature=0.1,
         max_tokens=800,
@@ -229,7 +229,7 @@ Generate a complete legal strategy. Structure your response as JSON:
 
     client = get_llm()
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
         max_tokens=1500,

@@ -1,0 +1,103 @@
+# Startuop / CourtroomAI: Technical Architecture & Flow
+
+As an AI/ML student, this document provides a comprehensive guide to understanding the entire system architecture, the Retrieval-Augmented Generation (RAG) pipeline, backend orchestration, frontend design, and the AI models backing the platform.
+
+---
+
+## 🗺️ High-Level System Architecture
+
+The application is split into three main layers: the **Frontend** (Vite + React), the **Backend API** (FastAPI), and the **AI/RAG Engine** (LangGraph, ChromaDB, and Groq).
+
+```mermaid
+graph TD
+    A[Client UI: React/Vite] <-->|HTTP Requests / JSON| B[FastAPI Web Server]
+    subgraph Backend Services
+        B <--> C[LangGraph Agent Orchestrator]
+        C <--> D[Hybrid Retriever: BM25 + Dense]
+        C <--> E[Citation Verifier: Llama 3 70B]
+    end
+    subgraph Data & Storage
+        D <--> F[Chroma Vector DB: Dense Embeddings]
+        D <--> G[Rank-BM25 Index: Raw Text Search]
+        F --> H[(sqlite3 storage: data/chroma_db)]
+    end
+```
+
+---
+
+## 💻 1. The Frontend (Client Interface)
+
+### Technology Used
+- **Vite + React (JavaScript)**: Vite is a ultra-fast, modern build tool for bundling frontend files. React handles the interactive UI.
+- **Tailwind CSS v3**: Used to style the entire interface.
+- **Framer Motion**: Integrated to build smooth animations, such as the initial fade-in and transition of the Nyaya Devi landing sequence.
+- **Axios**: A client library that sends HTTP network requests to the FastAPI backend.
+
+### What it does in this project
+The frontend provides a dual-pane workspace:
+- **Left Column (35%) — Case Brief Panel**: Renders metadata like the case title, judge, litigants, applicable penal sections, and an interactive timeline of past filings.
+- **Right Column (65%) — Argument Workspace**: A document-centric notepad where you write input or paste FIRs, click **Submit Argument**, and view the AI's structured, numbered paragraphs containing hoverable citations.
+
+---
+
+## ⚡ 2. The Backend (Web Server)
+
+### Technology Used
+- **FastAPI (Python)**: A high-performance, asynchronous web framework built on standard Python type hints.
+- **Uvicorn**: A lightning-fast ASGI web server implementation used to run FastAPI.
+- **pdfplumber**: A library used to extract text and tables from PDF documents (like FIRs or Charge Sheets) uploaded by the advocate.
+
+### What it does in this project
+- Exposes API endpoints like `/analyze` (for generating strategies) and `/upload` (for parsing PDF files).
+- Receives the raw FIR text and user perspective (Defense vs. Prosecution).
+- Routes requests to the **LangGraph Agent** to kick off search, verification, and synthesis pipelines.
+- Formats and replies with the final structured JSON containing strategies, statutory provisions, and verified precedents.
+
+---
+
+## 🔍 3. The RAG Pipeline (Retrieval-Augmented Generation)
+
+A standard RAG pipeline takes user input, retrieves relevant documents from a database, and appends them to the LLM prompt to ground its response in factual data. This project uses a highly robust **Hybrid Retrieval** setup.
+
+### A. RAG Libraries & Setup
+- **Sentence-Transformers (`sentence-transformers`)**: Used to generate dense vector embeddings for legal documents.
+- **LangChain Chroma (`langchain_chroma`)**: Connects Python code to the Chroma database.
+- **Rank-BM25 (`rank_bm25`)**: A standard search library that computes BM25 relevance scores for exact term match (essential for catching specific acts and section codes like "420 IPC" or "438 CrPC").
+- **ChromaDB (`chromadb`)**: An open-source, developer-friendly vector database.
+
+### B. Storage & Vector DB Location
+- **Where it is stored**: The vector database indices are serialized and saved locally on disk in the directory:
+  `courtroom-ai/data/chroma_db/` (backed by a `chroma.sqlite3` database file).
+- **The Corpus**: Contains chunks of 50,000+ legislative documents, Bare Acts, and precedent case judgments.
+
+### C. Hybrid Retrieval Logic (Reciprocal Rank Fusion)
+```
+                  ┌──> BM25 Keyword Search ─────┐
+Legal Text Query ─┤                             ├──> RRF Ensemble ──> Top K Documents
+                  └──> Dense Semantic Search ───┘
+```
+1. **Dense Retriever**: Embeds the legal query using the `BAAI/bge-base-en-v1.5` model, then performs cosine-similarity search against the ChromaDB collection.
+2. **BM25 Retriever**: Tokenizes the legal query and scores it against all documents in the corpus to match specific keywords and legal terms.
+3. **Reciprocal Rank Fusion (RRF)**: A ranking algorithm that merges the ranked lists from both retrievers to yield a single, optimal list of relevant precedents.
+
+---
+
+## 🧠 4. LLM Agents & Verification (The Reasoning Layer)
+
+This system uses a **multi-tool LangGraph Agent** running on the **Groq API** for extreme speed.
+
+### Model Choices & Rationale
+1. **Llama 3 70B (Orchestration, Legal Reasoning, and Citation Verification)**:
+   - *Why 70B*: Legal analysis requires advanced reasoning. A smaller model is prone to legal hallucinations. The **Citation Verifier** runs an LLM-as-a-judge prompt on 70B to double-check that retrieved passages *actually* support the proposed arguments. If a passage is irrelevant, it is **REJECTED**.
+2. **Llama 3 8B (Formatting and Summarization)**:
+   - *Why 8B*: Used for simpler tasks like parsing final outputs, generating next steps, or extracting entities, saving API cost and latency.
+
+### The LangGraph State Workflow
+```
+[User Input] ──> [Orchestrator] ──> [RAG Search] ──> [Citation Verifier] ──> [Synthesize Strategy] ──> [JSON Output]
+```
+1. **Ingest**: Agent receives case facts.
+2. **Analyze**: Agent calls a tool to map statutory sections.
+3. **Retrieve**: Agent calls the Hybrid Retriever to query ChromaDB and BM25.
+4. **Verify**: Agent calls the Verifier to weed out hallucinated citations.
+5. **Synthesize**: Agent merges arguments, counter-arguments, and active precedents into the final editorial document returned to the frontend.
