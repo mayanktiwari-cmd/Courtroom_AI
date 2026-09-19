@@ -6,6 +6,7 @@ Prevents hallucinated or irrelevant citations from reaching the lawyer.
 """
 
 import json
+import logging
 import os
 from typing import List
 from dataclasses import dataclass
@@ -15,6 +16,8 @@ from langchain_core.documents import Document
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,7 +55,7 @@ Respond ONLY in this exact JSON format, nothing else:
 class CitationVerifier:
     def __init__(self):
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        self.model = "llama-3.3-70b-versatile"  # 70B for accuracy — citation verification is critical
+        self.model = "openai/gpt-oss-120b"  # 120B for accuracy — citation verification is critical
 
     def verify_single(self, argument: str, document: Document) -> VerificationResult:
         """Verify one passage against one argument."""
@@ -73,6 +76,10 @@ class CitationVerifier:
                 max_tokens=150,
             )
             raw = response.choices[0].message.content.strip()
+            if raw.startswith("```json"):
+                raw = raw[7:-3].strip()
+            elif raw.startswith("```"):
+                raw = raw[3:-3].strip()
 
             # Parse JSON response
             result = json.loads(raw)
@@ -84,7 +91,8 @@ class CitationVerifier:
                 doc_metadata=meta,
             )
 
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logger.error(f"JSONDecodeError: {e}. Raw response: {raw}")
             # If LLM doesn't return valid JSON, default to REJECTED
             return VerificationResult(
                 verdict="REJECTED",
@@ -120,12 +128,18 @@ class CitationVerifier:
             result = self.verify_single(argument, doc)
             if result.verdict == "VERIFIED" and result.confidence >= min_confidence:
                 results.append(result)
-                print(f"  [✓ VERIFIED] {doc.metadata.get('title', 'Unknown')[:50]} | confidence: {result.confidence}")
+                logger.info(
+                    f"VERIFIED: {doc.metadata.get('title', 'Unknown')[:50]} | "
+                    f"confidence: {result.confidence}"
+                )
             else:
                 rejected_count += 1
-                print(f"  [✗ REJECTED] {doc.metadata.get('title', 'Unknown')[:50]} | {result.reason}")
+                logger.info(
+                    f"REJECTED: {doc.metadata.get('title', 'Unknown')[:50]} | "
+                    f"{result.reason}"
+                )
 
-        print(f"\n[VERIFIER] {len(results)} verified, {rejected_count} rejected")
+        logger.info(f"Verification complete: {len(results)} verified, {rejected_count} rejected")
         return results
 
 
