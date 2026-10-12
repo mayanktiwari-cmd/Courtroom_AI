@@ -22,6 +22,7 @@ class GraphState(TypedDict):
     ipc_sections: List[Dict[str, Any]]
     retrieved_docs: List[Dict[str, Any]]
     verified_citations: List[Dict[str, Any]]
+    citation_warning: bool
     strategy: Dict[str, Any]
     error: Optional[str]
 
@@ -39,9 +40,10 @@ def ipc_section_mapper_node(state: GraphState) -> GraphState:
             model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=800,
+            max_tokens=4000,
         )
         content = response.choices[0].message.content.strip()
+        print(f"DEBUG LLM OUTPUT: {content}")
         
         # Groq sometimes wraps json in ```json ... ```
         if content.startswith("```json"):
@@ -68,15 +70,22 @@ def case_retriever_node(state: GraphState) -> GraphState:
         if not sections:
             return {"error": "No IPC sections found to build query."}
             
-        # Build query from the first (primary) section
-        primary = sections[0]
-        query = f"{primary.get('title', '')} {primary.get('section', '')}"
-        
         retriever = get_retriever()
         reranker = get_reranker()
-        
-        raw_docs = retriever.retrieve(query)
-        reranked_docs = reranker.rerank(query, raw_docs)
+
+        all_docs = []
+        seen_ids = set()
+        for section in sections:
+            query = f"{section.get('title', '')} {section.get('section', '')} Indian court judgment"
+            docs = retriever.retrieve(query)
+            for doc in docs:
+                doc_id = doc.metadata.get('doc_id', '') + str(doc.metadata.get('chunk_index', ''))
+                if doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    all_docs.append(doc)
+
+        combined_query = " ".join([s.get('title', '') for s in sections])
+        reranked_docs = reranker.rerank(combined_query, all_docs)
         
         # Take top 5
         top_docs = reranked_docs[:5]
@@ -120,6 +129,11 @@ def citation_verifier_node(state: GraphState) -> GraphState:
         
         results = verifier.verify_batch(argument, docs, min_confidence=0.6)
         
+        # Step 1 — Lower confidence threshold on retry
+        if not results:
+            logger.info("0 citations verified at min_confidence=0.6. Retrying with min_confidence=0.4...")
+            results = verifier.verify_batch(argument, docs, min_confidence=0.4)
+        
         verified = []
         for r in results:
             verified.append({
@@ -131,10 +145,18 @@ def citation_verifier_node(state: GraphState) -> GraphState:
                 "reason": r.reason,
             })
             
+        # Step 2 — If still 0 after retry, do NOT error out
         if not verified:
-            return {"error": "0 citations verified. No relevant precedents found."}
+            logger.warning("Still 0 citations verified after retry. Proceeding with warning.")
+            return {
+                "verified_citations": [],
+                "citation_warning": True
+            }
             
-        return {"verified_citations": verified}
+        return {
+            "verified_citations": verified,
+            "citation_warning": False
+        }
     except Exception as e:
         logger.error(f"Error in citation_verifier: {e}")
         return {"error": f"Error in citation_verifier: {str(e)}"}
@@ -156,7 +178,7 @@ def strategy_synthesizer_node(state: GraphState) -> GraphState:
             model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
-            max_tokens=1500,
+            max_tokens=4000,
         )
         content = response.choices[0].message.content.strip()
         
@@ -166,6 +188,17 @@ def strategy_synthesizer_node(state: GraphState) -> GraphState:
             content = content[3:-3].strip()
             
         strategy = json.loads(content)
+        
+        # Step 3 — Update strategy_synthesizer_node to handle empty citations
+        if not state.get("verified_citations") and state.get("citation_warning"):
+            note = (
+                "Note: No verified precedents found for this specific case combination. "
+                "Arguments below are based on IPC sections and general legal principles only. "
+                "Independent verification of citations is strongly advised."
+            )
+            exec_summary = strategy.get("executive_summary", "")
+            strategy["executive_summary"] = f"{note}\n\n{exec_summary}" if exec_summary else note
+
         return {"strategy": strategy}
     except Exception as e:
         logger.error(f"Error in strategy_synthesizer: {e}")
@@ -215,7 +248,8 @@ if __name__ == "__main__":
     sample_fir = "The accused entered the house at night and stole jewelry. When confronted, he attacked the owner with a knife, causing grievous hurt."
     initial_state = {
         "fir_text": sample_fir,
-        "perspective": "prosecution"
+        "perspective": "prosecution",
+        "citation_warning": False
     }
     
     result = courtroom_app.invoke(initial_state)

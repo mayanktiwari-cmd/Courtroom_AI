@@ -1,83 +1,184 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import StrategyCard from '../components/StrategyCard';
+import { Link, Navigate } from 'react-router-dom';
 
-export default function Results({ analysisData }) {
-  if (!analysisData) {
-    return (
-      <div className="max-w-3xl mx-auto py-20 text-center px-6">
-        <div className="bg-card shadow-sm border border-border p-8 space-y-4">
-          <div className="section-blue-rule mx-auto w-fit">
-            <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#007BFF] font-semibold">
-              Docket Empty
-            </span>
-          </div>
-          <h2 className="font-serif text-2xl text-text-main">No Active Case Strategy Compiled</h2>
-          <p className="text-sm font-sans text-text-muted max-w-md mx-auto">
-            Submit a case FIR or legal document in the Evidence Vault to generate an advocate strategy and verified Kanoon citations.
-          </p>
-          <Link
-            to="/analyze"
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#007BFF] text-white hover:bg-[#005CE6] font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-sm mt-4"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Go to Evidence Vault
-          </Link>
-        </div>
-      </div>
-    );
-  }
+function strengthDot(strength) {
+  const s = (strength || '').toLowerCase();
+  if (s === 'strong') return '#16a34a';
+  if (s === 'medium') return '#ca8a04';
+  return '#dc2626';
+}
+
+export default function Results({ data }) {
+  if (!data) return <Navigate to="/analyze" replace />;
 
   const {
-    strategy,
-    raw_response,
-    verified_citations,
-    ipc_sections,
-    processing_time,
-    num_steps,
-  } = analysisData;
+    executive_summary = '',
+    key_legal_issues = [],
+    primary_arguments = [],
+    counter_arguments_to_anticipate = [],
+    recommended_next_steps = [],
+    overall_case_strength = '',
+    risk_factors = [],
+  } = data;
 
   return (
-    <div className="max-w-4xl mx-auto py-12 sm:py-16 px-6 sm:px-8 space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 border-b border-border bg-card p-6 shadow-sm">
-        <div>
-          <div className="section-blue-rule mb-2">
-            <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#007BFF] font-semibold">
-              Compiled Legal Strategy
-            </span>
-          </div>
-          <h1 className="font-serif text-3xl font-semibold text-text-main tracking-tighter">
-            Startuop v. Meridian Holdings — Case Strategy
-          </h1>
-          <p className="text-xs font-mono text-text-muted uppercase tracking-wider mt-1 font-semibold">
-            Case No. 2024-CV-0841 | High Court of Delhi
-          </p>
-        </div>
-
-        <div className="flex items-center gap-4 text-[11px] font-mono text-[#0047AB] uppercase tracking-wider shrink-0 font-bold bg-blue-50 px-3 py-1.5 border border-[#007BFF]/30">
-          <span>Execution: {processing_time}s</span>
-          <span className="text-[#007BFF]">|</span>
-          <span>{num_steps} Agent Steps</span>
-        </div>
-      </div>
-
-      <div className="flex justify-start">
+    <div className="min-h-screen bg-page">
+      {/* Top bar */}
+      <header className="px-6 py-5 max-w-doc mx-auto flex items-center justify-between">
+        <Link to="/" className="font-serif font-semibold text-heading text-lg">
+          CourtroomAI
+        </Link>
         <Link
           to="/analyze"
-          className="text-xs font-mono uppercase tracking-wider font-semibold text-[#007BFF] hover:text-[#0047AB] transition-colors flex items-center gap-1.5"
+          className="font-sans text-xs text-muted hover:text-body transition-colors"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Submit New Case FIR
+          New Analysis
         </Link>
-      </div>
+      </header>
 
-      <StrategyCard
-        strategy={strategy}
-        rawResponse={raw_response}
-        verifiedCitations={verified_citations}
-        ipcSections={ipc_sections}
-      />
+      {/* Brief content */}
+      <main className="max-w-doc mx-auto px-6 pt-4 pb-24">
+
+        {/* ─── Executive Summary ─── */}
+        <section>
+          <h2 className="font-serif text-heading mb-3" style={{ fontSize: '22px' }}>
+            Executive Summary
+          </h2>
+
+          {/* Case strength */}
+          {overall_case_strength && (
+            <p className="mb-4 font-sans text-sm">
+              <span
+                className="inline-block w-2 h-2 rounded-full mr-2"
+                style={{
+                  backgroundColor: strengthDot(overall_case_strength),
+                  verticalAlign: 'middle',
+                }}
+              />
+              <span className="text-body">
+                Assessment: {overall_case_strength}
+              </span>
+            </p>
+          )}
+
+          <p className="text-body font-sans text-base leading-relaxed whitespace-pre-line">
+            {executive_summary}
+          </p>
+        </section>
+
+        <hr className="my-10 border-rule" />
+
+        {/* ─── Key Legal Issues ─── */}
+        {key_legal_issues.length > 0 && (
+          <section>
+            <h2 className="font-serif text-heading mb-3" style={{ fontSize: '22px' }}>
+              Key Legal Issues
+            </h2>
+            <ol className="list-decimal list-outside ml-5 space-y-2">
+              {key_legal_issues.map((issue, i) => (
+                <li key={i} className="text-body font-sans text-base leading-relaxed pl-1">
+                  {issue}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        <hr className="my-10 border-rule" />
+
+        {/* ─── Primary Arguments ─── */}
+        {primary_arguments.length > 0 && (
+          <section>
+            <h2 className="font-serif text-heading mb-3" style={{ fontSize: '22px' }}>
+              Arguments
+            </h2>
+            <div className="space-y-6">
+              {primary_arguments.map((arg, i) => (
+                <div key={i}>
+                  <p className="text-body font-sans text-base leading-relaxed">
+                    <span className="text-muted font-medium mr-1">{i + 1}.</span>
+                    {arg.argument}
+                    {arg.strength && (
+                      <span className="text-muted text-sm ml-1">
+                        ({arg.strength})
+                      </span>
+                    )}
+                  </p>
+                  {arg.supporting_citation && (
+                    <p className="mt-1 text-muted font-sans text-xs uppercase tracking-label">
+                      Ref: {arg.supporting_citation}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <hr className="my-10 border-rule" />
+
+        {/* ─── Counter Arguments ─── */}
+        {counter_arguments_to_anticipate.length > 0 && (
+          <section>
+            <h2 className="font-serif text-heading mb-3" style={{ fontSize: '22px' }}>
+              Anticipated Counter-Arguments
+            </h2>
+            <div className="space-y-2 ml-4">
+              {counter_arguments_to_anticipate.map((arg, i) => (
+                <p key={i} className="text-body font-sans text-base leading-relaxed">
+                  <span className="text-muted mr-2">—</span>{arg}
+                </p>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <hr className="my-10 border-rule" />
+
+        {/* ─── Risk Factors ─── */}
+        {risk_factors.length > 0 && (
+          <section>
+            <h2 className="font-serif text-heading mb-3" style={{ fontSize: '22px' }}>
+              Risk Factors
+            </h2>
+            <div className="space-y-2 ml-4">
+              {risk_factors.map((risk, i) => (
+                <p key={i} className="text-body font-sans text-base leading-relaxed">
+                  <span className="text-muted mr-2">—</span>{risk}
+                </p>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <hr className="my-10 border-rule" />
+
+        {/* ─── Recommended Next Steps ─── */}
+        {recommended_next_steps.length > 0 && (
+          <section>
+            <h2 className="font-serif text-heading mb-3" style={{ fontSize: '22px' }}>
+              Recommended Next Steps
+            </h2>
+            <ol className="list-decimal list-outside ml-5 space-y-2">
+              {recommended_next_steps.map((step, i) => (
+                <li key={i} className="text-body font-sans text-base leading-relaxed pl-1">
+                  {step}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        <hr className="my-10 border-rule" />
+
+        {/* ─── Footer ─── */}
+        <footer className="pt-2">
+          <p className="text-muted font-sans" style={{ fontSize: '11px', lineHeight: 1.5 }}>
+            This analysis was generated by CourtroomAI and does not constitute legal advice.
+            All citations and arguments must be independently verified.
+          </p>
+        </footer>
+      </main>
     </div>
   );
 }

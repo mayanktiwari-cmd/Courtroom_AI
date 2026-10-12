@@ -92,29 +92,15 @@ app.include_router(upload_router)
 # ─────────────────────────────────────────────
 @app.get("/api/health", tags=["Health"])
 async def health_check():
-    """System health check — returns vector count and uptime."""
+    """System health check — returns vector count and model status."""
     import chromadb
 
-    vector_count = 0
-    raw_doc_count = 0
-
-    try:
-        client = chromadb.PersistentClient(path="data/chroma_db")
-        collection = client.get_collection("courtroom_judgments")
-        vector_count = collection.count()
-    except Exception:
-        pass
-
-    try:
-        raw_doc_count = len(list(Path("data/raw").glob("*.json")))
-    except Exception:
-        pass
-
+    client = chromadb.PersistentClient(path="data/chroma_db")
+    col = client.get_collection("courtroom_judgments")
     return {
-        "status": "healthy",
-        "vector_count": vector_count,
-        "raw_documents": raw_doc_count,
-        "uptime_seconds": round(time.time() - _start_time, 1),
+        "status": "ok",
+        "vectors_in_db": col.count(),
+        "model_loaded": True
     }
 
 

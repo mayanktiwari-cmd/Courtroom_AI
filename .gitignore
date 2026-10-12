@@ -21,3 +21,7 @@ frontend/dist/
 # IDE
 .vscode/
 .idea/
+
+# Scratch & test scripts
+scratch_*.py
+test_*.py

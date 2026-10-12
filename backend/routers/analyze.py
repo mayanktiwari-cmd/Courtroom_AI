@@ -17,7 +17,6 @@ router = APIRouter(prefix="/api", tags=["Analysis"])
 
 @router.post(
     "/analyze",
-    response_model=AnalyzeResponse,
     responses={500: {"model": ErrorResponse}},
     summary="Analyze a FIR and generate legal strategy",
     description="Takes FIR text or case description, runs the full pipeline "
@@ -39,43 +38,25 @@ async def analyze_case(request: AnalyzeRequest):
     start_time = time.time()
 
     try:
-        from agent.graph import run_analysis
+        from agent.graph import courtroom_app
 
-        result = run_analysis(
-            fir_text=request.fir_text,
-            perspective=request.perspective,
-        )
+        state = {
+            "fir_text": request.fir_text,
+            "perspective": request.perspective,
+            "citation_warning": False,
+        }
+        result = courtroom_app.invoke(state)
 
-        processing_time = round(time.time() - start_time, 2)
+        if result.get("error"):
+            raise HTTPException(
+                status_code=500,
+                detail=result["error"],
+            )
 
-        # Try to parse strategy JSON from the final response
-        strategy = {}
-        ipc_sections = []
-        verified_citations = []
+        return result.get("strategy", {})
 
-        raw_response = result.get("final_response", "")
-
-        # Extract JSON blocks from the response if present
-        try:
-            # The agent's final response often contains embedded JSON
-            if "{" in raw_response:
-                json_start = raw_response.index("{")
-                json_end = raw_response.rindex("}") + 1
-                strategy = json.loads(raw_response[json_start:json_end])
-        except (json.JSONDecodeError, ValueError):
-            # If we can't parse JSON, the raw_response is the strategy text
-            strategy = {"raw_text": raw_response}
-
-        return AnalyzeResponse(
-            success=True,
-            strategy=strategy,
-            ipc_sections=ipc_sections,
-            verified_citations=verified_citations,
-            raw_response=raw_response,
-            processing_time=processing_time,
-            num_steps=result.get("num_steps", 0),
-        )
-
+    except HTTPException:
+        raise
     except Exception as e:
         processing_time = round(time.time() - start_time, 2)
         raise HTTPException(

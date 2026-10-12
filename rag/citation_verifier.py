@@ -73,7 +73,7 @@ class CitationVerifier:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,  # deterministic for verification tasks
-                max_tokens=150,
+                max_tokens=4000,
             )
             raw = response.choices[0].message.content.strip()
             if raw.startswith("```json"):

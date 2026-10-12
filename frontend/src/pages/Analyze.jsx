@@ -1,27 +1,26 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import FIRInput from '../components/FIRInput';
+import { Link } from 'react-router-dom';
 import { analyzeCase } from '../api/client';
 
 export default function Analyze({ onAnalysisComplete }) {
+  const [firText, setFirText] = useState('');
+  const [perspective, setPerspective] = useState('defense');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
 
-  const handleAnalyze = async ({ firText, perspective }) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!firText.trim() || firText.trim().length < 20) return;
+
     setIsLoading(true);
     setError(null);
 
     try {
       const data = await analyzeCase({ firText, perspective });
       onAnalysisComplete(data);
-      navigate('/results');
     } catch (err) {
-      console.error(err);
       setError(
-        err.response?.data?.detail?.error ||
-        err.response?.data?.message ||
-        'Failed to connect to backend server. Ensure FastAPI backend is active on port 8000.'
+        err.response?.data?.detail || 'Analysis failed. Please try again.'
       );
     } finally {
       setIsLoading(false);
@@ -29,41 +28,90 @@ export default function Analyze({ onAnalysisComplete }) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-12 px-6 sm:px-8 space-y-8">
-      {/* Header section with blue rule */}
-      <div className="border-b border-border pb-6 space-y-2">
-        <div className="section-blue-rule">
-          <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-[#007BFF] font-semibold">
-            Evidence Vault & Case Submission
-          </span>
-        </div>
-        <h1 className="font-serif text-3xl font-semibold text-text-main tracking-tighter">
-          Startuop v. Meridian Holdings — Case No. 2024-CV-0841
-        </h1>
-        <p className="text-xs font-mono text-text-muted uppercase tracking-wider">
-          Pretrial Conference Scheduled | Courtroom AI Docket Entry
-        </p>
-      </div>
+    <div className="min-h-screen bg-page">
+      {/* Top bar */}
+      <header className="px-6 py-5 max-w-doc mx-auto">
+        <Link to="/" className="font-serif font-semibold text-heading text-lg">
+          CourtroomAI
+        </Link>
+      </header>
 
-      {/* Loading state */}
-      {isLoading ? (
-        <div className="p-8 bg-card shadow-sm border-l-4 border-[#007BFF] text-sm font-mono italic text-[#0047AB] space-y-2">
-          <p className="font-semibold">Analyzing precedents…</p>
-          <p className="text-xs text-text-muted not-italic">
-            Cross-referencing 50,000+ Indian Kanoon judgments, extracting statutory IPC provisions, and executing 70B LLM-as-Judge citation verification.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {error && (
-            <div className="p-4 border border-red-200 bg-red-50 text-xs font-mono text-red-700 shadow-sm">
-              <span className="font-bold uppercase">System Warning: </span>
-              {error}
+      {/* Form */}
+      <main className="max-w-doc mx-auto px-6 pt-8 pb-24">
+        <form onSubmit={handleSubmit}>
+          {/* Textarea */}
+          <label
+            htmlFor="fir-input"
+            className="block font-sans text-muted uppercase text-xs tracking-label mb-3"
+          >
+            Describe the case
+          </label>
+          <textarea
+            id="fir-input"
+            value={firText}
+            onChange={(e) => setFirText(e.target.value)}
+            placeholder="Paste the FIR text, legal notice, or describe the facts of the case…"
+            rows={10}
+            className="w-full border border-rule bg-white text-body font-sans text-base p-4 resize-y focus:outline-none focus:border-heading"
+            style={{ borderRadius: '2px', lineHeight: 1.7 }}
+          />
+
+          {/* Perspective toggle */}
+          <div className="mt-8">
+            <span className="block font-sans text-muted uppercase text-xs tracking-label mb-3">
+              Perspective
+            </span>
+            <div className="flex gap-6">
+              <button
+                type="button"
+                onClick={() => setPerspective('defense')}
+                className={`font-sans text-sm pb-1 border-b-2 transition-colors ${
+                  perspective === 'defense'
+                    ? 'text-heading border-heading font-medium'
+                    : 'text-muted border-transparent hover:text-body'
+                }`}
+              >
+                Defense
+              </button>
+              <button
+                type="button"
+                onClick={() => setPerspective('prosecution')}
+                className={`font-sans text-sm pb-1 border-b-2 transition-colors ${
+                  perspective === 'prosecution'
+                    ? 'text-heading border-heading font-medium'
+                    : 'text-muted border-transparent hover:text-body'
+                }`}
+              >
+                Prosecution
+              </button>
             </div>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <p className="mt-6 text-sm text-red-600 font-sans">{error}</p>
           )}
-          <FIRInput onAnalyze={handleAnalyze} isLoading={isLoading} />
-        </div>
-      )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={isLoading || firText.trim().length < 20}
+            className="mt-10 bg-heading text-white font-sans text-sm font-medium px-8 py-3 disabled:opacity-40"
+            style={{ borderRadius: '4px' }}
+          >
+            {isLoading ? 'Analyzing…' : 'Generate Strategy'}
+          </button>
+
+          {/* Loading state */}
+          {isLoading && (
+            <p className="mt-4 text-muted text-sm font-sans">
+              Running IPC mapping, retrieval, citation verification, and strategy synthesis.
+              <br />
+              This typically takes 30–90 seconds.
+            </p>
+          )}
+        </form>
+      </main>
     </div>
   );
 }
