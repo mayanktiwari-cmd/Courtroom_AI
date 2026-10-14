@@ -241,6 +241,7 @@ workflow.add_edge("strategy_synthesizer", END)
 
 # Compile
 courtroom_app = workflow.compile()
+app = courtroom_app
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
