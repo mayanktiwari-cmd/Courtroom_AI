@@ -11,7 +11,43 @@ from agent.prompts import (
 )
 from agent.tools import get_llm, get_retriever, get_reranker, get_verifier
 
+import re
+
 logger = logging.getLogger(__name__)
+
+
+def _extract_json_response(content: str) -> dict:
+    """Robustly parse JSON from LLM output, handling markdown fences, preambles, and raw JSON."""
+    if not content:
+        raise ValueError("Received empty response from LLM")
+    
+    content = content.strip()
+    
+    # 1. Direct parse
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+        
+    # 2. Extract from markdown code blocks ```json ... ``` or ``` ... ```
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", content)
+    if match:
+        try:
+            return json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            pass
+            
+    # 3. Find outermost curly braces { ... }
+    first_brace = content.find("{")
+    last_brace = content.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        json_candidate = content[first_brace:last_brace + 1].strip()
+        try:
+            return json.loads(json_candidate)
+        except json.JSONDecodeError:
+            pass
+            
+    raise ValueError(f"Could not parse valid JSON from LLM output: {content[:200]}")
 
 # ---------------------------------------------------------
 # State Definition
@@ -42,16 +78,10 @@ def ipc_section_mapper_node(state: GraphState) -> GraphState:
             temperature=0.1,
             max_tokens=4000,
         )
-        content = response.choices[0].message.content.strip()
+        content = (response.choices[0].message.content or "").strip()
         print(f"DEBUG LLM OUTPUT: {content}")
         
-        # Groq sometimes wraps json in ```json ... ```
-        if content.startswith("```json"):
-            content = content[7:-3].strip()
-        elif content.startswith("```"):
-            content = content[3:-3].strip()
-            
-        data = json.loads(content)
+        data = _extract_json_response(content)
         sections = data.get("sections", [])
         
         if not sections:
@@ -175,19 +205,15 @@ def strategy_synthesizer_node(state: GraphState) -> GraphState:
         )
         
         response = client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=4000,
         )
-        content = response.choices[0].message.content.strip()
+        content = (response.choices[0].message.content or "").strip()
+        print(f"DEBUG STRATEGY OUTPUT: {content[:300]}...")
         
-        if content.startswith("```json"):
-            content = content[7:-3].strip()
-        elif content.startswith("```"):
-            content = content[3:-3].strip()
-            
-        strategy = json.loads(content)
+        strategy = _extract_json_response(content)
         
         # Step 3 — Update strategy_synthesizer_node to handle empty citations
         if not state.get("verified_citations") and state.get("citation_warning"):
