@@ -58,7 +58,7 @@ class CitationVerifier:
         self.model = "openai/gpt-oss-120b"  # 120B for accuracy — citation verification is critical
 
     def verify_single(self, argument: str, document: Document) -> VerificationResult:
-        """Verify one passage against one argument."""
+        """Verify one passage against one argument. Retries on transient I/O errors."""
         meta = document.metadata
         prompt = VERIFICATION_PROMPT.format(
             argument=argument,
@@ -68,14 +68,39 @@ class CitationVerifier:
             date=meta.get("date", "Unknown Date"),
         )
 
+        max_retries = 3
+        base_delay = 2.0
+        raw = ""
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,  # deterministic for verification tasks
+                    max_tokens=4000,
+                )
+                raw = response.choices[0].message.content.strip()
+                break  # success — exit retry loop
+            except (OSError, ConnectionError, TimeoutError, ConnectionResetError) as e:
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** (attempt - 1))
+                    logger.warning(
+                        f"[citation_verifier] Transient error on attempt {attempt}/{max_retries}: {e}. "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    import time
+                    time.sleep(delay)
+                else:
+                    return VerificationResult(
+                        verdict="REJECTED",
+                        reason=f"Verification failed after {max_retries} retries: {str(e)}",
+                        confidence=0.0,
+                        passage=document.page_content,
+                        doc_metadata=meta,
+                    )
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,  # deterministic for verification tasks
-                max_tokens=4000,
-            )
-            raw = response.choices[0].message.content.strip()
             if raw.startswith("```json"):
                 raw = raw[7:-3].strip()
             elif raw.startswith("```"):

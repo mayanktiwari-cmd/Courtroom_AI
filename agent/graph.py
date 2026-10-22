@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import List, Optional, Literal, TypedDict, Dict, Any
+import time
+from typing import List, Optional, Literal, TypedDict, Dict, Any, Callable, TypeVar
 
 from langgraph.graph import StateGraph, START, END
 from langchain_core.documents import Document
@@ -14,6 +15,44 @@ from agent.tools import get_llm, get_retriever, get_reranker, get_verifier
 import re
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+# Transient errors that should be retried
+_RETRYABLE_ERRORS = (OSError, ConnectionError, TimeoutError, ConnectionResetError)
+
+
+def _retry_with_backoff(
+    fn: Callable[[], T],
+    *,
+    max_retries: int = 3,
+    base_delay: float = 2.0,
+    node_name: str = "unknown",
+) -> T:
+    """
+    Retry a callable with exponential backoff on transient I/O errors.
+    
+    Retries on: OSError (includes [Errno 5]), ConnectionError, TimeoutError.
+    Fails immediately on: ValueError, KeyError, json.JSONDecodeError (logic bugs).
+    """
+    last_exception = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return fn()
+        except _RETRYABLE_ERRORS as e:
+            last_exception = e
+            delay = base_delay * (2 ** (attempt - 1))  # 2s, 4s, 8s
+            logger.warning(
+                f"[{node_name}] Transient error on attempt {attempt}/{max_retries}: {e}. "
+                f"Retrying in {delay:.1f}s..."
+            )
+            time.sleep(delay)
+        except Exception:
+            # Non-retryable error — let it propagate immediately
+            raise
+
+    # All retries exhausted
+    raise last_exception  # type: ignore[misc]
 
 
 def _extract_json_response(content: str) -> dict:
@@ -69,16 +108,18 @@ class GraphState(TypedDict):
 def ipc_section_mapper_node(state: GraphState) -> GraphState:
     logger.info("Executing node: ipc_section_mapper")
     try:
-        client = get_llm()
-        prompt = IPC_MAPPER_PROMPT.format(case_description=state["fir_text"])
-        
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=4000,
-        )
-        content = (response.choices[0].message.content or "").strip()
+        def _do_ipc_mapping():
+            client = get_llm()
+            prompt = IPC_MAPPER_PROMPT.format(case_description=state["fir_text"])
+            response = client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=4000,
+            )
+            return (response.choices[0].message.content or "").strip()
+
+        content = _retry_with_backoff(_do_ipc_mapping, node_name="ipc_section_mapper")
         print(f"DEBUG LLM OUTPUT: {content}")
         
         data = _extract_json_response(content)
@@ -99,26 +140,27 @@ def case_retriever_node(state: GraphState) -> GraphState:
         sections = state.get("ipc_sections", [])
         if not sections:
             return {"error": "No IPC sections found to build query."}
-            
-        retriever = get_retriever()
-        reranker = get_reranker()
 
-        all_docs = []
-        seen_ids = set()
-        for section in sections:
-            query = f"{section.get('title', '')} {section.get('section', '')} Indian court judgment"
-            docs = retriever.retrieve(query)
-            for doc in docs:
-                doc_id = doc.metadata.get('doc_id', '') + str(doc.metadata.get('chunk_index', ''))
-                if doc_id not in seen_ids:
-                    seen_ids.add(doc_id)
-                    all_docs.append(doc)
+        def _do_retrieval():
+            retriever = get_retriever()
+            reranker = get_reranker()
 
-        combined_query = " ".join([s.get('title', '') for s in sections])
-        reranked_docs = reranker.rerank(combined_query, all_docs)
-        
-        # Take top 5
-        top_docs = reranked_docs[:5]
+            all_docs = []
+            seen_ids = set()
+            for section in sections:
+                query = f"{section.get('title', '')} {section.get('section', '')} Indian court judgment"
+                docs = retriever.retrieve(query)
+                for doc in docs:
+                    doc_id = doc.metadata.get('doc_id', '') + str(doc.metadata.get('chunk_index', ''))
+                    if doc_id not in seen_ids:
+                        seen_ids.add(doc_id)
+                        all_docs.append(doc)
+
+            combined_query = " ".join([s.get('title', '') for s in sections])
+            reranked_docs = reranker.rerank(combined_query, all_docs)
+            return reranked_docs[:5]
+
+        top_docs = _retry_with_backoff(_do_retrieval, node_name="case_retriever")
         
         docs_list = []
         for doc in top_docs:
@@ -149,20 +191,22 @@ def citation_verifier_node(state: GraphState) -> GraphState:
         primary = sections[0]
         argument = f"Charge is {primary.get('section', '')}: {primary.get('title', '')}. Need precedents supporting or refuting this charge based on evidence."
         
-        verifier = get_verifier()
-        
         # Convert dicts back to Documents
         docs = [
             Document(page_content=d["passage"], metadata=d) 
             for d in retrieved_docs
         ]
-        
-        results = verifier.verify_batch(argument, docs, min_confidence=0.6)
-        
-        # Step 1 — Lower confidence threshold on retry
-        if not results:
-            logger.info("0 citations verified at min_confidence=0.6. Retrying with min_confidence=0.4...")
-            results = verifier.verify_batch(argument, docs, min_confidence=0.4)
+
+        def _do_verification():
+            verifier = get_verifier()
+            results = verifier.verify_batch(argument, docs, min_confidence=0.6)
+            # Lower confidence threshold on retry if nothing passed
+            if not results:
+                logger.info("0 citations verified at min_confidence=0.6. Retrying with min_confidence=0.4...")
+                results = verifier.verify_batch(argument, docs, min_confidence=0.4)
+            return results
+
+        results = _retry_with_backoff(_do_verification, node_name="citation_verifier")
         
         verified = []
         for r in results:
@@ -175,7 +219,7 @@ def citation_verifier_node(state: GraphState) -> GraphState:
                 "reason": r.reason,
             })
             
-        # Step 2 — If still 0 after retry, do NOT error out
+        # If still 0 after retry, do NOT error out
         if not verified:
             logger.warning("Still 0 citations verified after retry. Proceeding with warning.")
             return {
@@ -195,22 +239,24 @@ def citation_verifier_node(state: GraphState) -> GraphState:
 def strategy_synthesizer_node(state: GraphState) -> GraphState:
     logger.info("Executing node: strategy_synthesizer")
     try:
-        client = get_llm()
-        
         prompt = STRATEGY_SYNTHESIZER_PROMPT.format(
             case_facts=state["fir_text"],
             ipc_sections=json.dumps(state.get("ipc_sections", []), indent=2),
             verified_citations=json.dumps(state.get("verified_citations", []), indent=2),
             perspective=state["perspective"]
         )
-        
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=4000,
-        )
-        content = (response.choices[0].message.content or "").strip()
+
+        def _do_strategy_synthesis():
+            client = get_llm()
+            response = client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=4000,
+            )
+            return (response.choices[0].message.content or "").strip()
+
+        content = _retry_with_backoff(_do_strategy_synthesis, node_name="strategy_synthesizer")
         print(f"DEBUG STRATEGY OUTPUT: {content[:300]}...")
         
         strategy = _extract_json_response(content)
