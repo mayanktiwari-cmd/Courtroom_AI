@@ -24,7 +24,8 @@ uvicorn[standard]==0.30.6
 python-multipart==0.0.9
 
 # LLM Client
-groq==0.9.0
+groq>=0.9.0
+httpx<0.28.0
 
 # Evaluation
 ragas==0.1.21

@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api", tags=["Verification"])
                 "verifies each passage using LLM-as-judge pattern. "
                 "Returns only verified citations with confidence scores.",
 )
+@router.post("/verify/", include_in_schema=False)
 async def verify_citations(request: VerifyRequest):
     """
     Standalone citation verification.

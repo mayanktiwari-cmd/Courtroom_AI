@@ -19,9 +19,18 @@ export default function Analyze({ onAnalysisComplete }) {
       const data = await analyzeCase({ firText, perspective });
       onAnalysisComplete(data);
     } catch (err) {
-      setError(
-        err.response?.data?.detail || 'Analysis failed. Please try again.'
-      );
+      console.error('Analysis request error:', err);
+      let message = 'Analysis failed. Please check backend connection and try again.';
+      if (err.response?.data?.detail) {
+        message = typeof err.response.data.detail === 'string'
+          ? err.response.data.detail
+          : JSON.stringify(err.response.data.detail);
+      } else if (err.response?.status === 405) {
+        message = 'Error 405 (Method Not Allowed): Ensure your backend URL is HTTPS and points to the correct API endpoint.';
+      } else if (err.message) {
+        message = err.message;
+      }
+      setError(message);
     } finally {
       setIsLoading(false);
     }

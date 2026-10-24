@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api", tags=["Analysis"])
                 "(IPC mapping → case retrieval → citation verification → strategy synthesis), "
                 "and returns a structured legal strategy with verified precedents.",
 )
+@router.post("/analyze/", include_in_schema=False)
 async def analyze_case(request: AnalyzeRequest):
     """
     Main pipeline endpoint.
@@ -68,3 +69,13 @@ async def analyze_case(request: AnalyzeRequest):
                 "processing_time": processing_time,
             }
         )
+
+
+@router.get("/analyze", include_in_schema=False)
+@router.get("/analyze/", include_in_schema=False)
+async def analyze_get_info():
+    """Fallback handler to prevent 405 if a proxy or redirect downgrades POST to GET."""
+    return {
+        "status": "endpoint_active",
+        "message": "POST method required. Send JSON with 'fir_text' and 'perspective' ('defense' or 'prosecution')."
+    }
